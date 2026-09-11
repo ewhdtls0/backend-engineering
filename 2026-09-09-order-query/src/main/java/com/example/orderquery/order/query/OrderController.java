@@ -1,5 +1,7 @@
-package com.example.orderquery;
+package com.example.orderquery.order.query;
 
+import com.example.orderquery.common.error.InvalidPageRequestException;
+import com.example.orderquery.order.query.dto.OrderPageResponse;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.PageRequest;
 @RestController

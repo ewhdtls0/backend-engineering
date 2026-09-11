@@ -1,8 +1,17 @@
 package com.example.pricehistory.service;
 
-import com.example.pricehistory.dto.*;
-import com.example.pricehistory.repository.*;
+import com.example.pricehistory.domain.PriceHistory;
+import com.example.pricehistory.domain.Product;
+import com.example.pricehistory.dto.ChangePriceRequest;
+import com.example.pricehistory.dto.PriceHistoryResponse;
+import com.example.pricehistory.exception.ProductNotFoundException;
+import com.example.pricehistory.repository.PriceHistoryRepository;
+import com.example.pricehistory.repository.ProductRepository;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,12 +23,42 @@ public class PriceHistoryService {
         this.productRepository = productRepository;
         this.priceHistoryRepository = priceHistoryRepository;
     }
-    // TODO: 트랜잭션 경계, 동일 가격 판단, 변경 책임, 저장 방식을 직접 결정하세요.
+    @Transactional
     public void changePrice(Long productId, ChangePriceRequest request) {
-        throw new UnsupportedOperationException("TODO: changePrice");
+        Product productEntity = getProductEntity(productId);
+
+        int compareFlag = productEntity.getPrice().compareTo(request.price());
+
+        if (compareFlag != 0) {
+            LocalDateTime now = LocalDateTime.now();
+            BigDecimal oldPrice = productEntity.getPrice();
+
+            priceHistoryRepository.save(
+                    new PriceHistory(productEntity, oldPrice, request.price(), request.reason(), now)
+            );
+
+            productEntity.changePrice(request.price(), now);
+        }
     }
-    // TODO: 선택 기간 조건, 정렬, DTO 변환, 존재하지 않는 상품 처리를 구현하세요.
+
+    @Transactional(readOnly = true)
     public List<PriceHistoryResponse> getPriceHistories(Long productId, LocalDateTime from, LocalDateTime to) {
-        throw new UnsupportedOperationException("TODO: getPriceHistories");
+        Product productEntity = getProductEntity(productId);
+
+        return priceHistoryRepository.findAllByProductId(productEntity.getId(), from, to)
+                .stream()
+                .map(priceHistory -> new PriceHistoryResponse(
+                        priceHistory.getPreviousPrice(),
+                        priceHistory.getChangedPrice(),
+                        priceHistory.getReason(),
+                        priceHistory.getChangedAt()))
+                .toList();
+
+    }
+
+    @NonNull
+    private Product getProductEntity(Long productId) {
+        return productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
     }
 }

@@ -1,4 +1,4 @@
-package com.example.orderquery;
+package com.example.orderquery.member;
 
 import jakarta.persistence.*;
 @Entity

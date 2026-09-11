@@ -59,9 +59,9 @@ Repository에는 기본 JpaRepository만 있습니다.
 
 ## 테스트 순서
 ApplicationSmokeTest는 설정/컨텍스트 기동 확인용으로 활성화되어 있습니다.
-PriceHistoryMissionTest의 8개 테스트는 @Disabled 상태입니다.
-각 TODO를 구현하면서 @Disabled를 하나씩 제거하세요. 비활성화만 제거하면
-fail 문장이 실패하도록 되어 있어 빈 테스트를 성공으로 착각하지 않습니다.
+PriceHistoryMissionTest에는 활성화된 검증 테스트 8개가 있습니다.
+현재 서비스 핵심 로직은 의도적으로 미구현이라, 정상·동일 가격·조회·404·롤백
+테스트는 실패합니다. 구현을 시작하기 전에 이 실패를 확인하고, 구현 후 전체 테스트를 통과시키세요.
 
 1. 정상 변경: 상품과 이력의 모든 필드 확인.
 2. 동일 가격: 이력 미생성, updatedAt 불변, 소수 scale 차이 확인.

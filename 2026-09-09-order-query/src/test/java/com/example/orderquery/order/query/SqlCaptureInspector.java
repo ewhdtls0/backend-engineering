@@ -1,4 +1,4 @@
-package com.example.orderquery;
+package com.example.orderquery.order.query;
 
 import org.hibernate.resource.jdbc.spi.StatementInspector;
 

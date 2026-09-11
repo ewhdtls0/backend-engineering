@@ -1,5 +1,6 @@
-package com.example.orderquery;
+package com.example.orderquery.order;
 
+import com.example.orderquery.product.Product;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 @Entity

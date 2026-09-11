@@ -1,4 +1,4 @@
-package com.example.orderquery;
+package com.example.orderquery.product;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;

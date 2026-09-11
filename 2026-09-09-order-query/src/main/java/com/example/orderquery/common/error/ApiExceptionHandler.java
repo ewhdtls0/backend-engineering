@@ -1,4 +1,4 @@
-package com.example.orderquery;
+package com.example.orderquery.common.error;
 
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;

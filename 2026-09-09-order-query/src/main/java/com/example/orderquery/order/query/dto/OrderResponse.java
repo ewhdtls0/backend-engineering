@@ -1,9 +1,9 @@
-package com.example.orderquery;
+package com.example.orderquery.order.query.dto;
 
+import com.example.orderquery.order.Order;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public record OrderResponse(Long orderId, LocalDateTime orderedAt, List<OrderItemResponse> items, BigDecimal totalPrice) {
 

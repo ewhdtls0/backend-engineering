@@ -1,5 +1,6 @@
-package com.example.orderquery;
+package com.example.orderquery.order;
 
+import com.example.orderquery.member.Member;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

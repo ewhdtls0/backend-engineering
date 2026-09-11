@@ -1,5 +1,11 @@
-package com.example.orderquery;
+package com.example.orderquery.order.query;
 
+import com.example.orderquery.common.error.MemberNotFoundException;
+import com.example.orderquery.member.Member;
+import com.example.orderquery.order.Order;
+import com.example.orderquery.order.query.dto.OrderItemResponse;
+import com.example.orderquery.order.query.dto.OrderResponse;
+import com.example.orderquery.product.Product;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
@@ -17,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = {
         "spring.jpa.properties.hibernate.generate_statistics=true",
-        "spring.jpa.properties.hibernate.session_factory.statement_inspector=com.example.orderquery.SqlCaptureInspector"
+        "spring.jpa.properties.hibernate.session_factory.statement_inspector=com.example.orderquery.order.query.SqlCaptureInspector"
 })
 @Transactional
 class OrderQueryServiceTest {

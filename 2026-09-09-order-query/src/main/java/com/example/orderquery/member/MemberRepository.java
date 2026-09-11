@@ -1,4 +1,4 @@
-package com.example.orderquery;
+package com.example.orderquery.member;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 public interface MemberRepository extends JpaRepository<Member, Long> {

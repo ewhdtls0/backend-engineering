@@ -1,5 +1,11 @@
-package com.example.orderquery;
+package com.example.orderquery.order.query;
 
+import com.example.orderquery.common.error.MemberNotFoundException;
+import com.example.orderquery.member.MemberRepository;
+import com.example.orderquery.order.Order;
+import com.example.orderquery.order.OrderRepository;
+import com.example.orderquery.order.query.dto.OrderPageResponse;
+import com.example.orderquery.order.query.dto.OrderResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;

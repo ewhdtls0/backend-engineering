@@ -1,11 +1,13 @@
 package com.example.pricehistory.controller;
 
-import com.example.pricehistory.dto.*;
+import com.example.pricehistory.dto.ChangePriceRequest;
+import com.example.pricehistory.dto.PriceHistoryResponse;
 import com.example.pricehistory.service.PriceHistoryService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -23,6 +25,13 @@ public class ProductPriceController {
     public List<PriceHistoryResponse> getPriceHistories(@PathVariable Long productId,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+
+        if (from != null && to != null) {
+            if (from.isAfter(to)) {
+                throw new IllegalArgumentException();
+            }
+        }
+
         return service.getPriceHistories(productId, from, to);
     }
 }

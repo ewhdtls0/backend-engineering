@@ -19,9 +19,14 @@ public class Product {
     public Product(String name, BigDecimal price, LocalDateTime updatedAt) {
         this.name = name; this.price = price; this.updatedAt = updatedAt;
     }
-    // TODO: 가격 변경 인터페이스와 책임을 직접 설계하세요.
+
     public Long getId() { return id; }
     public String getName() { return name; }
     public BigDecimal getPrice() { return price; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+
+    public void changePrice(BigDecimal price, LocalDateTime now) {
+        this.price = price;
+        this.updatedAt = now;
+    }
 }

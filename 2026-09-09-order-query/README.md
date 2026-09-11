@@ -96,7 +96,7 @@ Repository는 기본 JpaRepository 뼈대만 제공합니다. 특정 조회 기�
 
 ## 테스트 시나리오
 
-`src/test/java/com/example/orderquery/OrderFixtures.java`의 helper는 데이터를 저장하고 flush/clear합니다.
+`src/test/java/com/example/orderquery/order/query/OrderFixtures.java`의 helper는 데이터를 저장하고 flush/clear합니다.
 
 | 시나리오 | 준비 | 기대값 |
 |---|---|---|

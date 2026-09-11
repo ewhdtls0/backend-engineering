@@ -1,5 +1,6 @@
-package com.example.orderquery;
+package com.example.orderquery.order.query;
 
+import com.example.orderquery.member.Member;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

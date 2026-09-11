@@ -1,5 +1,8 @@
-package com.example.orderquery;
+package com.example.orderquery.order.query;
 
+import com.example.orderquery.member.Member;
+import com.example.orderquery.order.Order;
+import com.example.orderquery.product.Product;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
