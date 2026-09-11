@@ -9,9 +9,8 @@ import java.time.LocalDateTime;
 public class PriceHistory {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    // 스타터는 단순 ID 참조를 사용합니다. 필요하면 Product 연관관계로 변경하세요.
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "product_id", nullable = false)
     private Product product;
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal previousPrice;

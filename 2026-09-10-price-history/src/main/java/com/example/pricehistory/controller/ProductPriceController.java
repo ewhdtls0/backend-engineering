@@ -2,6 +2,7 @@ package com.example.pricehistory.controller;
 
 import com.example.pricehistory.dto.ChangePriceRequest;
 import com.example.pricehistory.dto.PriceHistoryResponse;
+import com.example.pricehistory.exception.InvalidDateRangeException;
 import com.example.pricehistory.service.PriceHistoryService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -28,7 +29,7 @@ public class ProductPriceController {
 
         if (from != null && to != null) {
             if (from.isAfter(to)) {
-                throw new IllegalArgumentException();
+                throw new InvalidDateRangeException();
             }
         }
 
