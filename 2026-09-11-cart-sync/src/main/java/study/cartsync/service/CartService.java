@@ -26,26 +26,29 @@ public class CartService {
     private final ProductRepository products;
 
     public CartService(CartRepository carts, CartItemRepository cartItems, ProductRepository products) {
-        this.carts = carts; this.cartItems = cartItems; this.products = products;
+        this.carts = carts;
+        this.cartItems = cartItems;
+        this.products = products;
     }
 
     @Transactional
     public CartResponse syncItems(Long cartId, SyncCartItemsRequest request) {
 
+        if (request == null || request.items() == null) {
+            throw new MissionException(MissionException.Code.INVALID_REQUEST, "잘못된 요청입니다.");
+        }
         Set<Long> productIds = new HashSet<>();
         request.items()
                 .forEach(item -> {
+                    if (item == null || item.productId() == null || item.quantity() == null) {
+                        throw new MissionException(MissionException.Code.INVALID_REQUEST, "잘못된 요청입니다.");
+                    }
                     boolean added = productIds.add(item.productId());
                     if (!added) {
                         throw new MissionException(MissionException.Code.INVALID_REQUEST, "중복된 상품이 있습니다.");
                     }
-                    if (item.quantity() < 0)
+                    if (item.quantity() <= 0)
                         throw new MissionException(MissionException.Code.INVALID_REQUEST, "상품 수량이 잘못 되었습니다.");
-
-                    if (item.productId() == null || item.quantity() == null) {
-                        throw new MissionException(MissionException.Code.INVALID_REQUEST, "잘못된 요청입니다.");
-
-                    }
                 });
 
         Cart cartEntity = carts.findById(cartId)
@@ -61,7 +64,7 @@ public class CartService {
             );
         }
 
-        List<CartItem> allWithProduct = cartItems.findAllWithProduct(cartId);
+        List<CartItem> allWithProduct = cartEntity.getItems();
 
         Set<Long> requestItemIds = request.items()
                 .stream()
@@ -89,7 +92,7 @@ public class CartService {
         // 이미있는 상품 중 개수가 다르면 업데이트
         allWithProduct.forEach(cartItem -> {
             request.items().stream()
-                    .filter(item -> item.productId().equals(cartItem.getId()))
+                    .filter(item -> item.productId().equals(cartItem.getProduct().getId()))
                     .findFirst()
                     .ifPresent(item -> {
                         if (item.quantity() != cartItem.getQuantity()) {

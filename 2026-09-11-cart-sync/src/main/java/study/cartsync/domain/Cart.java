@@ -17,4 +17,7 @@ public class Cart {
     public Long getId() { return id; }
     public List<CartItem> getItems() { return items; }
     // 필요하다면 양방향 연관관계 편의 메서드를 설계하세요.
+    public void setItems(List<CartItem> cartItems) {
+        this.items = cartItems;
+    }
 }

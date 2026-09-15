@@ -31,6 +31,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static study.cartsync.exception.MissionException.Code.*;
 
 @SpringBootTest(properties = {
+    // 테스트 fixture가 데이터를 준비하므로 앱의 data.sql에 의존하지 않습니다.
+    "spring.sql.init.mode=never",
     "spring.datasource.url=jdbc:h2:mem:cart-test;DB_CLOSE_DELAY=-1",
     "spring.jpa.properties.hibernate.generate_statistics=true",
     "spring.jpa.properties.hibernate.session_factory.statement_inspector=study.cartsync.CartSyncIntegrationTest$SqlRecorder",
