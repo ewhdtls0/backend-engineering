@@ -22,12 +22,10 @@ import java.util.stream.Collectors;
 @Service
 public class CartService {
     private final CartRepository carts;
-    private final CartItemRepository cartItems;
     private final ProductRepository products;
 
-    public CartService(CartRepository carts, CartItemRepository cartItems, ProductRepository products) {
+    public CartService(CartRepository carts, ProductRepository products) {
         this.carts = carts;
-        this.cartItems = cartItems;
         this.products = products;
     }
 
@@ -64,22 +62,22 @@ public class CartService {
             );
         }
 
-        List<CartItem> allWithProduct = cartEntity.getItems();
+        List<CartItem> cartItems = cartEntity.getItems();
 
         Set<Long> requestItemIds = request.items()
                 .stream()
                 .map(SyncCartItemsRequest.Item::productId)
                 .collect(Collectors.toSet());
 
-        Set<Long> cartItemProductIds = allWithProduct.stream()
+        Set<Long> cartItemProductIds = cartItems.stream()
                 .map(cartItem -> cartItem.getProduct().getId())
                 .collect(Collectors.toSet());
 
-        allWithProduct.removeIf(
+        cartItems.removeIf(
                 cartItem -> !requestItemIds.contains(cartItem.getProduct().getId())
         );
 
-        // 신규 상품 추가 및 요청 없는 상품 제거
+        // 없는 상품 제거 및 있는 상품 추가
         request.items().stream()
                 .filter(item -> !cartItemProductIds.contains(item.productId()))
                 .map(item -> {
@@ -87,10 +85,10 @@ public class CartService {
                             .orElseThrow(() -> new MissionException(MissionException.Code.PRODUCT_NOT_FOUND, "상품이 존재하지 않습니다."));
                     return new CartItem(cartEntity, productEntity, item.quantity());
                 })
-                .forEach(allWithProduct::add);
+                .forEach(cartItems::add);
 
         // 이미있는 상품 중 개수가 다르면 업데이트
-        allWithProduct.forEach(cartItem -> {
+        cartItems.forEach(cartItem -> {
             request.items().stream()
                     .filter(item -> item.productId().equals(cartItem.getProduct().getId()))
                     .findFirst()
@@ -106,7 +104,7 @@ public class CartService {
             BigDecimal totalPrice = BigDecimal.ZERO;
         };
 
-        allWithProduct.forEach(cartItem -> {
+        cartItems.forEach(cartItem -> {
             totalQuantity.addAndGet(cartItem.getQuantity());
             ref.totalPrice = ref.totalPrice.add(cartItem.getProduct().getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity())));
         });
@@ -114,7 +112,7 @@ public class CartService {
                 cartId,
                 totalQuantity.get(),
                 ref.totalPrice,
-                allWithProduct.stream()
+                cartItems.stream()
                         .map(cartItem -> new CartResponse.Item(
                                 cartItem.getProduct().getId(),
                                 cartItem.getProduct().getName(),
