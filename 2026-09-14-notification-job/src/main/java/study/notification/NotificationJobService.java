@@ -22,7 +22,12 @@ public class NotificationJobService {
     @Transactional
     public CreateJobResponse createJob(CreateJobRequest request) {
         // 유효성 검사
-        if (request == null || request.memberIds().isEmpty() || StringUtils.isBlank(request.message())) {
+        if (request == null
+                || request.memberIds() == null
+                || request.memberIds().isEmpty()
+                || StringUtils.isBlank(request.message())
+                || request.message().length() > 2_000
+                || request.memberIds().stream().anyMatch(id -> id == null || id <= 0)) {
             throw new MissionException(MissionException.Code.INVALID_REQUEST, "잘못된 요청입니다.");
         }
 
