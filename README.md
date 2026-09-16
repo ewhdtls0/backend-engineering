@@ -37,10 +37,13 @@ study/
 │   ├── CODE_REVIEW.md
 │   ├── build.gradle
 │   └── src/
-└── 2026-09-10-price-history/
-    ├── README.md
-    ├── build.gradle
-    └── src/
+├── 2026-09-10-price-history/
+│   ├── README.md
+│   ├── build.gradle
+│   └── src/
+├── 2026-09-11-cart-sync/
+├── 2026-09-14-notification-job/
+└── 2026-09-15-payment-request/
 ```
 
 각 날짜 디렉터리는 IntelliJ에서 별도로 열고 실행할 수 있는 독립 Gradle Spring Boot 프로젝트입니다. 루트 `study/` 디렉터리 전체는 하나의 Git 저장소로 관리합니다.
@@ -51,6 +54,9 @@ study/
 |---|---|---|---|
 | 2026-09-09 | [주문 내역 조회 API](2026-09-09-order-query/README.md) | Spring, JPA, Pagination, Query Performance | [Code Review](2026-09-09-order-query/CODE_REVIEW.md) |
 | 2026-09-10 | [상품 가격 변경 이력 조회](2026-09-10-price-history/README.md) | Spring, JPA, Transaction, Dirty Checking | - |
+| 2026-09-11 | [장바구니 항목 동기화](2026-09-11-cart-sync/README.md) | Spring, JPA, Aggregate, Collection Sync | [Code Review](2026-09-11-cart-sync/CODE_REVIEW.md) |
+| 2026-09-14 | [대량 알림 발송 작업](2026-09-14-notification-job/README.md) | Spring, JPA, Failure Isolation, Job Status | - |
+| 2026-09-15 | [멱등 결제 승인](2026-09-15-payment-request/README.md) | Spring, JPA, Idempotency, Concurrency | - |
 
 새 과제는 `YYYY-MM-DD-mission-name/` 형식으로 추가하고 위 표에 학습 주제와 결과를 기록합니다.
 
