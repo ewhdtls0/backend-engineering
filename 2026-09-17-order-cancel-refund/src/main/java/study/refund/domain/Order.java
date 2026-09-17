@@ -32,4 +32,14 @@ public class Order {
     public void changeStatus(OrderStatus status) {
         this.status = java.util.Objects.requireNonNull(status);
     }
+
+    public void startCancellation() {
+        if (status != OrderStatus.PAID) throw new IllegalStateException("PAID 주문만 취소를 시작할 수 있습니다.");
+        status = OrderStatus.CANCELING;
+    }
+
+    public void completeCancellation() {
+        if (status != OrderStatus.CANCELING) throw new IllegalStateException("CANCELING 주문만 취소를 완료할 수 있습니다.");
+        status = OrderStatus.CANCELED;
+    }
 }

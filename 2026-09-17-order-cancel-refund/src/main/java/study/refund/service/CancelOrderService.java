@@ -1,98 +1,47 @@
 package study.refund.service;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import study.refund.domain.Order;
-import study.refund.domain.OrderStatus;
-import study.refund.domain.Payment;
-import study.refund.domain.PaymentStatus;
 import study.refund.dto.CancelOrderResponse;
-import study.refund.exception.OrderNotCancelableException;
-import study.refund.exception.OrderNotFoundException;
-import study.refund.repository.OrderRepository;
-import study.refund.repository.PaymentRepository;
+import study.refund.exception.RefundProcessingException;
 
 @Service
 public class CancelOrderService {
-    private final OrderRepository orders;
-    private final PaymentRepository payments;
+    private final RefundStateService refundState;
     private final PaymentGateway gateway;
-    private final EntityManager em;
 
-    public CancelOrderService(OrderRepository orders, PaymentRepository payments, PaymentGateway gateway, EntityManager em) {
-        this.orders = orders;
-        this.payments = payments;
+    public CancelOrderService(RefundStateService refundState, PaymentGateway gateway) {
+        this.refundState = refundState;
         this.gateway = gateway;
-        this.em = em;
     }
 
-    @Transactional
     public CancelOrderResponse cancel(Long orderId) {
-        if (orderId == null || orderId <= 0) {
-            throw new IllegalArgumentException("잘못된 요청입니다.");
-        }
-
-        Order order = orders.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException(orderId));
-
-        Payment payment = payments.findByOrderId(orderId)
-                .orElseThrow(() -> new EntityNotFoundException("진행된 결제가 없습니다."));
-
-        // 취소 됐거나 취소 진행 중
-        if (order.getStatus().equals(OrderStatus.CANCELED) || order.getStatus().equals(OrderStatus.CANCELING)) {
-            return new CancelOrderResponse(
-                    orderId,
-                    order.getStatus(),
-                    CancelOrderResponse.RefundStatus.COMPLETED
-            );
-        }
-
-        try {
-            // 결제 시도
-            order.changeStatus(OrderStatus.CANCELING);
-            payment.changeStatus(PaymentStatus.REFUND_PENDING);
-
-            em.flush();
-
-            gateway.refund(payment.getPaymentKey(), payment.getAmount());
-
-            order.changeStatus(OrderStatus.CANCELED);
-            payment.changeStatus(PaymentStatus.REFUNDED);
-        } catch (Exception e) {
-            payment.changeStatus(PaymentStatus.REFUND_FAILED);
-            return new CancelOrderResponse(orderId, order.getStatus(), CancelOrderResponse.RefundStatus.FAILED);
-        }
-
-        return new CancelOrderResponse(
-                orderId,
-                order.getStatus(),
-                CancelOrderResponse.RefundStatus.COMPLETED
-        );
+        RefundStateService.Preparation preparation = refundState.prepareCancellation(orderId);
+        if (!preparation.requiresGatewayCall()) return preparation.response();
+        return executeRefund(preparation.attempt(), true);
     }
 
-    @Transactional
     public void processRefund(Long paymentId) {
-        if (paymentId == null || paymentId <= 0) {
-            throw new IllegalArgumentException("잘못된 요청입니다.");
-        }
+        executeRefund(refundState.prepareRetry(paymentId), false);
+    }
 
-        Payment payment = payments.findByIdWithOrder(paymentId)
-                .orElseThrow(() -> new EntityNotFoundException("진행된 결제가 없습니다."));
-
-        if (payment.getStatus().equals(PaymentStatus.REFUNDED) || payment.getOrder().getStatus().equals(OrderStatus.CANCELED)) {
-            throw new OrderNotCancelableException(payment.getOrder().getId());
-        }
+    private CancelOrderResponse executeRefund(RefundStateService.RefundAttempt attempt, boolean returnFailure) {
         try {
-            payment.changeStatus(PaymentStatus.REFUND_PENDING);
-            em.flush();
-            gateway.refund(payment.getPaymentKey(), payment.getAmount());
+            // 준비 트랜잭션은 이미 끝났다. 느린 외부 호출 동안 DB 연결과 잠금을 점유하지 않는다.
+            gateway.refund(attempt.paymentKey(), attempt.amount());
+        } catch (RefundRejectedException rejected) {
+            // 외부 효과가 없다고 확정된 거절만 안전하게 다시 시도할 수 있는 실패로 기록한다.
+            refundState.markRejected(attempt.paymentId());
+            return returnFailure ? refundState.failedResponse(attempt.orderId()) : null;
+        } catch (RuntimeException outcomeUnknown) {
+            // timeout처럼 성공 여부를 모르면 PENDING을 보존한다. 자동 재호출은 중복 환불 위험이 있다.
+            throw new RefundProcessingException("환불 결과를 확인할 수 없습니다. 결제사 조회 후 복구해야 합니다.", outcomeUnknown);
+        }
 
-            payment.getOrder().changeStatus(OrderStatus.CANCELED);
-            payment.changeStatus(PaymentStatus.REFUNDED);
-        } catch (Exception e) {
-            payment.changeStatus(PaymentStatus.REFUND_FAILED);
+        try {
+            // 외부 성공 뒤 완료 저장은 별도 트랜잭션이다. 실패해도 앞서 커밋한 PENDING은 남는다.
+            return refundState.complete(attempt.paymentId());
+        } catch (RuntimeException completionFailure) {
+            throw new RefundProcessingException("외부 환불은 성공했지만 완료 상태 저장에 실패했습니다.", completionFailure);
         }
     }
 }

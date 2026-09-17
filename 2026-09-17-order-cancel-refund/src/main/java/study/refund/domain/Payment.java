@@ -38,4 +38,21 @@ public class Payment {
     public void changeStatus(PaymentStatus status) {
         this.status = java.util.Objects.requireNonNull(status);
     }
+
+    public void startRefund() {
+        if (status != PaymentStatus.PAID && status != PaymentStatus.REFUND_FAILED) {
+            throw new IllegalStateException("PAID 또는 REFUND_FAILED 결제만 환불을 시작할 수 있습니다.");
+        }
+        status = PaymentStatus.REFUND_PENDING;
+    }
+
+    public void completeRefund() {
+        if (status != PaymentStatus.REFUND_PENDING) throw new IllegalStateException("REFUND_PENDING 결제만 완료할 수 있습니다.");
+        status = PaymentStatus.REFUNDED;
+    }
+
+    public void rejectRefund() {
+        if (status != PaymentStatus.REFUND_PENDING) throw new IllegalStateException("REFUND_PENDING 결제만 실패로 기록할 수 있습니다.");
+        status = PaymentStatus.REFUND_FAILED;
+    }
 }

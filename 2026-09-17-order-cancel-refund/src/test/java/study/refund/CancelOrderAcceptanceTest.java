@@ -6,6 +6,7 @@ import study.refund.domain.*;
 import study.refund.dto.CancelOrderResponse;
 import study.refund.exception.*;
 import study.refund.support.*;
+import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 
 @DisplayName("주문 취소 및 환불 인수 테스트")
@@ -94,6 +95,86 @@ class CancelOrderAcceptanceTest extends IntegrationSupport {
         assertThat(gateway.attempts()).hasSize(failedAttempts + 1).allMatch(expectedCall(f)::equals);
         assertThat(gateway.successes()).containsExactly(expectedCall(f));
         assertCompleted(f);
+    }
+
+    @Test
+    @DisplayName("취소 처리 중인 주문의 신규 취소 요청은 완료로 응답하지 않고 외부 환불도 호출하지 않는다")
+    void cancelingOrderDoesNotPretendToBeCompletedOrCallGateway() {
+        Fixture f = fixture(OrderStatus.CANCELING, PaymentStatus.REFUND_PENDING);
+
+        CancelOrderResponse result = service.cancel(f.orderId());
+
+        assertThat(result).isEqualTo(new CancelOrderResponse(
+                f.orderId(), OrderStatus.CANCELING, CancelOrderResponse.RefundStatus.PENDING));
+        assertThat(gateway.attempts()).isEmpty();
+        assertOutcomeUnknown(f);
+    }
+
+    @Test
+    @DisplayName("외부 환불 성공 후 완료 DB 저장이 실패하면 결과 불명 상태를 보존한다")
+    void externalSuccessThenDatabaseFailurePreservesUnknownOutcome() {
+        Fixture f = fixture(OrderStatus.PAID, PaymentStatus.PAID);
+        gateway.afterSuccess(CompletionWriteFailure::arm);
+
+        assertThatThrownBy(() -> service.cancel(f.orderId()))
+                .isInstanceOf(RefundProcessingException.class);
+
+        assertThat(gateway.attempts()).containsExactly(expectedCall(f));
+        assertThat(gateway.successes()).containsExactly(expectedCall(f));
+        assertThat(CompletionWriteFailure.hits()).isPositive();
+        assertOutcomeUnknown(f);
+    }
+
+    @Test
+    @DisplayName("결과가 불명확한 환불 대기는 자동 재호출하지 않고 상태를 그대로 보존한다")
+    void unknownPendingRefundIsNotRetriedAutomatically() {
+        Fixture f = fixture(OrderStatus.CANCELING, PaymentStatus.REFUND_PENDING);
+
+        assertThatThrownBy(() -> service.processRefund(f.paymentId()))
+                .isInstanceOf(OrderNotCancelableException.class);
+
+        assertThat(gateway.attempts()).isEmpty();
+        assertOutcomeUnknown(f);
+    }
+
+    @Test
+    @DisplayName("동시에 두 번 취소해도 외부 환불은 한 번만 호출되고 대기 요청은 진행 상태를 받는다")
+    void concurrentCancellationCallsGatewayOnlyOnce() throws Exception {
+        Fixture f = fixture(OrderStatus.PAID, PaymentStatus.PAID);
+        CountDownLatch gatewayEntered = new CountDownLatch(1);
+        CountDownLatch releaseGateway = new CountDownLatch(1);
+        gateway.beforeResult(() -> {
+            gatewayEntered.countDown();
+            await(releaseGateway);
+        });
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<CancelOrderResponse> first = executor.submit(() -> service.cancel(f.orderId()));
+            assertThat(gatewayEntered.await(3, TimeUnit.SECONDS)).isTrue();
+
+            CancelOrderResponse second = service.cancel(f.orderId());
+            assertThat(second.refundStatus()).isEqualTo(CancelOrderResponse.RefundStatus.PENDING);
+            assertThat(gateway.attempts()).containsExactly(expectedCall(f));
+
+            releaseGateway.countDown();
+            assertThat(first.get(3, TimeUnit.SECONDS).refundStatus())
+                    .isEqualTo(CancelOrderResponse.RefundStatus.COMPLETED);
+            assertThat(gateway.attempts()).containsExactly(expectedCall(f));
+            assertCompleted(f);
+        } finally {
+            releaseGateway.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(3, TimeUnit.SECONDS)) throw new AssertionError("gateway release timed out");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(e);
+        }
     }
 
     private void retry(Long paymentId) {

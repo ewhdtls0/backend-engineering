@@ -31,7 +31,7 @@ class StarterInfrastructureTest extends IntegrationSupport {
     @DisplayName("Fake gateway는 시도와 성공을 구분해 기록하고 초기화할 수 있다")
     void fakeRecordsAttemptsAndSuccessesSeparatelyAndCanReset() {
         gateway.rejectRequests(true);
-        assertThatThrownBy(() -> gateway.refund("key", 100)).isInstanceOf(FakePaymentGateway.GatewayRejectedException.class);
+        assertThatThrownBy(() -> gateway.refund("key", 100)).isInstanceOf(study.refund.service.RefundRejectedException.class);
         assertThat(gateway.attempts()).containsExactly(new FakePaymentGateway.Call("key", 100));
         assertThat(gateway.successes()).isEmpty();
         gateway.rejectRequests(false);
