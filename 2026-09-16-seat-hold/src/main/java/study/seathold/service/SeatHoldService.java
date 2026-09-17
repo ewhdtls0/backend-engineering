@@ -83,7 +83,7 @@ public class SeatHoldService {
             throw new SeatHoldException(HttpStatus.CONFLICT, "이미 선점된 좌석입니다.");
         }
 
-        if (seatHold.getExpiresAt().isEqual(LocalDateTime.now(clock)) || seatHold.getExpiresAt().isBefore(LocalDateTime.now(clock))) {
+        if (!seatHold.getExpiresAt().isAfter(LocalDateTime.now(clock)) || seatHold.getStatus().equals(SeatHoldStatus.EXPIRED)) {
             throw new SeatHoldException(HttpStatus.CONFLICT, "이미 만료된 선점입니다.");
         }
 
