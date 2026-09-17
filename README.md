@@ -59,6 +59,7 @@ study/
 | 2026-09-14 | [대량 알림 발송 작업](2026-09-14-notification-job/README.md) | Spring, JPA, Failure Isolation, Job Status | - |
 | 2026-09-15 | [멱등 결제 승인](2026-09-15-payment-request/README.md) | Spring, JPA, Idempotency, Concurrency | - |
 | 2026-09-16 | [만료되는 좌석 선점](2026-09-16-seat-hold/README.md) | Spring, JPA, Time, Concurrency, Atomicity | - |
+| 2026-09-17 | [주문 취소 후 환불 처리](2026-09-17-order-cancel-refund/README.md) | Spring, JPA, Refund, Failure Recovery, Transaction Boundary | - |
 
 새 과제는 `YYYY-MM-DD-mission-name/` 형식으로 추가하고 위 표에 학습 주제와 결과를 기록합니다.
 
