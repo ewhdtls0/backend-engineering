@@ -6,4 +6,5 @@ import java.util.Optional;
 
 public interface OrderIdempotencyKeyRepository extends JpaRepository<OrderIdempotencyKey, Long> {
     Optional<OrderIdempotencyKey> findByIdempotencyKey(String idempotencyKey);
+    void deleteByIdempotencyKey(String idempotencyKey);
 }

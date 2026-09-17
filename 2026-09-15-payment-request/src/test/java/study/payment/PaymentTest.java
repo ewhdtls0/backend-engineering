@@ -132,6 +132,62 @@ class PaymentTest {
         assertThat(orders.findById(other).orElseThrow().getStatus()).isEqualTo(OrderStatus.PENDING);
     }
     @Test
+    @DisplayName("이미 사용한 키의 다른 요청은 없는 주문 ID보다 CONFLICT가 우선한다")
+    void usedKeyTakesPriorityOverMissingOrder() {
+        service.pay(orderId, key, REQUEST);
+
+        error(() -> service.pay(Long.MAX_VALUE, key, REQUEST), MissionException.Code.CONFLICT);
+
+        assertThat(gateway.calls).hasSize(1);
+    }
+    @Test
+    @DisplayName("0원 결제는 같은 금액의 주문이 있어도 Gateway 호출 전에 거부한다")
+    void zeroAmountIsRejectedByService() {
+        Long zeroOrderId = new TransactionTemplate(manager)
+            .execute(s -> orders.saveAndFlush(new Order(0)).getId());
+
+        error(() -> service.pay(zeroOrderId, "zero-" + key, new PaymentRequest(0)),
+            MissionException.Code.INVALID_REQUEST);
+
+        assertThat(gateway.calls).isEmpty();
+        assertThat(payments.findByOrderId(zeroOrderId)).isEmpty();
+    }
+    @Test
+    @DisplayName("서로 다른 주문에서 같은 키가 동시에 와도 Gateway 승인은 한 번만 발생한다")
+    void sameKeyAcrossDifferentOrdersClaimsKeyBeforeGatewayApproval() throws Exception {
+        Long otherOrderId = new TransactionTemplate(manager)
+            .execute(s -> orders.saveAndFlush(new Order(35000)).getId());
+        gateway.delayMillis = 150;
+        var pool = Executors.newFixedThreadPool(2);
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        List<Future<PaymentResponse>> futures = List.of(
+            pool.submit(() -> payWhenStarted(orderId, key, ready, start)),
+            pool.submit(() -> payWhenStarted(otherOrderId, key, ready, start))
+        );
+        try {
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            List<PaymentResponse> successes = new ArrayList<>();
+            List<Throwable> failures = new ArrayList<>();
+            for (var future : futures) {
+                try { successes.add(future.get(30, TimeUnit.SECONDS)); }
+                catch (ExecutionException e) { failures.add(e.getCause()); }
+            }
+            assertThat(successes).hasSize(1);
+            assertThat(failures).hasSize(1).allSatisfy(error ->
+                assertThat(error).isInstanceOfSatisfying(MissionException.class,
+                    e -> assertThat(e.getCode()).isEqualTo(MissionException.Code.CONFLICT)));
+            assertThat(gateway.calls).hasSize(1);
+            assertThat(jdbc.queryForObject("select count(*) from payments", Long.class)).isEqualTo(1);
+        } finally {
+            start.countDown();
+            futures.forEach(future -> future.cancel(true));
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+    @Test
     @DisplayName("동일 요청 10개가 동시에 와도 Payment와 Gateway 승인은 각각 한 번만 발생한다")
     void tenConcurrentRequestsProduceOnePaymentAndOneGatewayApproval() throws Exception {
         gateway.delayMillis = 150;
@@ -242,5 +298,11 @@ class PaymentTest {
             .contentType("application/json").content(body)).andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         assertThat(rows()).isEmpty(); assertThat(gateway.calls).isEmpty();
+    }
+    private PaymentResponse payWhenStarted(Long requestedOrderId, String requestedKey,
+                                            CountDownLatch ready, CountDownLatch start) throws Exception {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("start gate timeout");
+        return service.pay(requestedOrderId, requestedKey, REQUEST);
     }
 }

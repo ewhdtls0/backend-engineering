@@ -43,7 +43,8 @@ study/
 │   └── src/
 ├── 2026-09-11-cart-sync/
 ├── 2026-09-14-notification-job/
-└── 2026-09-15-payment-request/
+├── 2026-09-15-payment-request/
+└── 2026-09-16-seat-hold/
 ```
 
 각 날짜 디렉터리는 IntelliJ에서 별도로 열고 실행할 수 있는 독립 Gradle Spring Boot 프로젝트입니다. 루트 `study/` 디렉터리 전체는 하나의 Git 저장소로 관리합니다.
@@ -57,6 +58,7 @@ study/
 | 2026-09-11 | [장바구니 항목 동기화](2026-09-11-cart-sync/README.md) | Spring, JPA, Aggregate, Collection Sync | [Code Review](2026-09-11-cart-sync/CODE_REVIEW.md) |
 | 2026-09-14 | [대량 알림 발송 작업](2026-09-14-notification-job/README.md) | Spring, JPA, Failure Isolation, Job Status | - |
 | 2026-09-15 | [멱등 결제 승인](2026-09-15-payment-request/README.md) | Spring, JPA, Idempotency, Concurrency | - |
+| 2026-09-16 | [만료되는 좌석 선점](2026-09-16-seat-hold/README.md) | Spring, JPA, Time, Concurrency, Atomicity | - |
 
 새 과제는 `YYYY-MM-DD-mission-name/` 형식으로 추가하고 위 표에 학습 주제와 결과를 기록합니다.
 

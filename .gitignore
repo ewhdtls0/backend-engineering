@@ -14,3 +14,7 @@ Thumbs.db
 *.log
 logs/
 application-local.yml
+
+*.mv.db
+
+*.trace.db
