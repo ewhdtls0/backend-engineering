@@ -4,7 +4,10 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "posts")
+@Table(name = "posts", indexes = @Index(
+        name = "idx_posts_member_created_id",
+        columnList = "member_id, created_at DESC, id DESC"
+))
 public class Post {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

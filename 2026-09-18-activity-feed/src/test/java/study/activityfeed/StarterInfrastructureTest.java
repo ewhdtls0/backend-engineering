@@ -9,6 +9,7 @@ import study.activityfeed.dto.*;
 import study.activityfeed.support.*;
 
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
@@ -109,5 +110,40 @@ class StarterInfrastructureTest extends DatabaseTest {
         assertThat(response.activities()).isEmpty();
         assertThatThrownBy(() -> response.activities().add(mutable.getFirst()))
                 .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test void activityTablesHaveMemberTimeAndIdCompositeIndexes() throws Exception {
+        assertThat(indexColumns("POSTS", "IDX_POSTS_MEMBER_CREATED_ID"))
+                .containsExactly("MEMBER_ID", "CREATED_AT", "ID");
+        assertThat(indexColumns("COMMENTS", "IDX_COMMENTS_MEMBER_CREATED_ID"))
+                .containsExactly("MEMBER_ID", "CREATED_AT", "ID");
+
+        String postPlan = jdbc.queryForObject("""
+                explain select id from posts
+                where member_id = ?
+                order by created_at desc, id desc
+                fetch first 20 rows only
+                """, String.class, Long.MAX_VALUE);
+        String commentPlan = jdbc.queryForObject("""
+                explain select id from comments
+                where member_id = ?
+                order by created_at desc, id desc
+                fetch first 20 rows only
+                """, String.class, Long.MAX_VALUE);
+        assertThat(postPlan).containsIgnoringCase("IDX_POSTS_MEMBER_CREATED_ID");
+        assertThat(commentPlan).containsIgnoringCase("IDX_COMMENTS_MEMBER_CREATED_ID");
+    }
+
+    private List<String> indexColumns(String table, String index) throws Exception {
+        List<String> columns = new ArrayList<>();
+        try (Connection connection = jdbc.getDataSource().getConnection();
+             ResultSet rows = connection.getMetaData().getIndexInfo(null, null, table, false, false)) {
+            while (rows.next()) {
+                if (index.equalsIgnoreCase(rows.getString("INDEX_NAME"))) {
+                    columns.add(rows.getString("COLUMN_NAME"));
+                }
+            }
+        }
+        return columns;
     }
 }

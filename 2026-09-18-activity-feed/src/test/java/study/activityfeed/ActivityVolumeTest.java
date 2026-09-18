@@ -56,6 +56,8 @@ class ActivityVolumeTest extends BusinessDatabaseTest {
             // Counts consumed result rows even when projected directly to DTOs or fetched through JDBC.
             sample.assertAtMost(5_000);
             assertThat(sample.sql()).as("Cold service call must perform a database read").isNotEmpty();
+            assertThat(sample.sql()).noneMatch(sql -> sql.toLowerCase(java.util.Locale.ROOT).contains("count("));
+            assertThat(sample.rows()).as("member row plus requested activity rows").isEqualTo(21);
             assertThat(stats.getEntityLoadCount()).as("Hibernate entities materialized during request")
                     .isLessThanOrEqualTo(5_000);
             System.out.printf("page=%d JDBC rows=%d entities=%d SQL=%s%n", page, sample.rows(),

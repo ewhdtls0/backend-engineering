@@ -74,21 +74,16 @@ POST의 content는 title, COMMENT의 content는 content입니다. `size`는 요�
 - 테스트를 비활성화하거나 테스트 전용 분기로 통과시키지 마세요. 테스트 계측을 우회하는 별도 DataSource/연결 생성도 하지 마세요.
 - 기존 날짜의 미션과 상위 저장소 설정은 이 과제의 구현 대상이 아닙니다.
 
-## 6. TODO 및 실행 방법
+## 6. 구현 및 실행 방법
 
-1. 테스트를 먼저 실행하고 실패 이유를 확인하세요.
-2. 동일 시각의 정렬 규칙을 선언하세요.
-3. `ActivityServiceImpl#getActivities(Long memberId, int page, int size)`를 구현하세요.
-4. 필요한 조회 계약과 구현, 예외 처리, 트랜잭션 경계를 작성하세요.
-5. 테스트를 통과시키고 SQL 및 조회 비용을 관찰하세요.
-6. 인덱스와 아래 질문에 대한 답을 문서로 남기세요.
+구현은 Post와 Comment를 `UNION ALL`로 합친 native query에 전역 정렬과 offset/limit를 적용합니다. 서비스는 회원 존재를 먼저 확인하고 읽기 전용 트랜잭션 안에서 projection 결과만 DTO로 변환합니다. 응답에 전체 개수가 없으므로 `Page`와 count query는 사용하지 않습니다.
 
 ```text
 src/main/java/study/activityfeed/
   ActivityFeedApplication.java
   domain/        Member, Post, Comment
-  repository/    최소 JPA 인터페이스
-  service/       ActivityService, ActivityServiceImpl (핵심 TODO)
+  repository/    JPA 저장소와 통합 활동 조회
+  service/       ActivityService, ActivityServiceImpl
   controller/    API 및 입력 검증
   dto/           응답 record 및 활동 종류
   exception/     회원 부재 예외 및 HTTP 매핑
@@ -126,7 +121,7 @@ chmod +x gradlew  # 실행 권한이 보존되지 않은 복사본에서 한 번
 
 `application.yml`은 SQL DEBUG 및 bind TRACE 로그를 켭니다. 테스트 프로필은 대량 입력 로그를 줄이고 Hibernate 통계를 켭니다. 테스트에서 SQL도 보고 싶다면 `application-test.yml`의 로깅 수준을 변경하세요. `JdbcTemplate` 또는 직접 JDBC로 작성한 쿼리는 Hibernate 로그에 나타나지 않으므로 JDBC 관찰 도구의 SQL 목록도 확인하세요.
 
-**초기 상태에서 전체 test는 실패하는 것이 정상입니다.** 핵심 서비스는 TODO의 `UnsupportedOperationException`을 던집니다. `testClasses`, Controller 및 인프라 테스트는 통과해야 합니다. HTML 결과는 `build/reports/tests/test/index.html`, XML은 `build/test-results/test/`에 생성됩니다.
+현재 전체 테스트 34개가 통과합니다. HTML 결과는 `build/reports/tests/test/index.html`, XML은 `build/test-results/test/`에 생성됩니다.
 
 ## 7. 테스트 시나리오
 
@@ -135,32 +130,32 @@ chmod +x gradlew  # 실행 권한이 보존되지 않은 복사본에서 한 번
 | 혼합 활동 | 전체 DTO 값, createdAt 내림차순, POST 제목/COMMENT 내용, 다른 회원 제외 |
 | 45개 / size 20 | 각각 20/20/5개, 정확한 각 페이지, 중복·누락 없음, 종료 뒤 빈 목록 |
 | POST만 / COMMENT만 | 첫 페이지와 남은 페이지 모두 정확 |
-| 동일 시각 45개 | 특정 tie-breaker를 강요하지 않고 전체 조회와 size 7 분할을 여러 번 비교 |
-| 빈 회원 / 매우 큰 page | 빈 목록, page 계산 overflow 방지 |
+| 동일 시각 45개 | POST 우선, type별 id 내림차순 및 size 7 페이지 재구성 결과 검증 |
+| 빈 회원 / 매우 큰 page | 빈 목록, long offset 계산, 실제 활동 SQL 실행, count 미실행 |
 | 없는 회원 | 실제 서비스의 예외 및 활동 테이블 SQL 미실행, 별도 MVC 404 매핑 |
 | 잘못된 입력 | 음수 page, size 0/음수/101, 잘못된 문자·정수 범위, memberId 오류 → 400, 서비스 미호출 |
 | 대량 데이터 | POST 10,000 + COMMENT 40,000, page 0/37의 정확한 DTO 및 조회량 제한 |
-| 인프라 자체 검사 | Spring context, mapping/LAZY/fixture, JDBC 관찰기, Hibernate 통계, 응답 불변 복사 |
+| 인프라 자체 검사 | Spring context, mapping/LAZY/fixture, JDBC 관찰기, Hibernate 통계, 응답 불변 복사, 복합 인덱스와 H2 실행 계획 |
 
-동일 시각 테스트는 작은 fixture 전체 응답을 기준 순서로 삼고 다른 크기의 모든 페이지를 다시 연결하여 비교합니다. 기준 응답 자체의 개수·내용도 fixture와 비교합니다. 이 테스트가 통과해도 DB의 우연한 반환 순서에 의존하는 구현까지 수학적으로 배제할 수는 없으므로 **선언된 완전한 정렬 규칙과 실제 쿼리를 함께 검토**해야 합니다. 최종 선택 후 그 규칙을 명시적으로 확인하는 테스트를 추가하세요.
+동일 시각 테스트는 선언한 `type DESC, id DESC` 순서를 직접 확인하고, 다른 크기의 모든 페이지를 다시 연결해 같은 전체 순서인지 반복 검증합니다.
 
 ### 조회량 관찰 도구의 범위
 
 `JdbcReadProbe`는 테스트에서만 DataSource를 감싸며, 관찰 범위 안에서 JDBC `ResultSet.next()`가 true를 반환한 횟수와 실행 SQL을 기록합니다. JPA 엔티티, DTO projection, 일반 JDBC 결과 모두 이 경계를 통과합니다. 대량 fixture 생성과 기대값 준비는 측정 범위 밖에서 수행하고, 영속성 컨텍스트를 비우고 fixture 트랜잭션을 커밋한 후 실제 서비스 호출만 측정합니다. 서비스 호출에는 테스트 트랜잭션이 없으므로 필요한 트랜잭션 경계는 구현에서 제공해야 합니다. Hibernate entity-load 통계도 함께 확인합니다.
 
-page 0과 37(size 20)에서 소비 행 수와 엔티티 적재 수는 각각 **5,000 이하**여야 합니다. 이는 최적 쿼리 수를 지정하는 조건이 아니라 50,000행 전량 적재 회귀를 막는 넉넉한 상한입니다. 응답만 맞추거나 모든 행을 DTO로 읽는 구현도 걸러냅니다. 관찰기 자체 테스트는 일부러 작은 상한을 초과해 계측이 실제 실패를 검출하는지 확인합니다.
+page 0과 37(size 20)에서 실제 관찰된 값은 JDBC 결과 21행과 Hibernate entity 1개입니다. Member 존재 확인 1행과 활동 projection 20행만 소비하며 count query는 실행하지 않습니다. 테스트에는 5,000행의 넉넉한 회귀 상한과 정확한 21행 assertion을 함께 둡니다.
 
 이 수치는 **DB 내부 scan/offset/정렬 비용이 아닙니다.** DB가 내부적으로 50,000행을 읽고 20행만 반환하면 관찰되는 결과 행은 20개일 수 있습니다. 실행 계획과 더 큰 page의 비용은 별도 분석이 필요합니다. 또한 현재 동기 서비스 호출 스레드와 Spring DataSource를 대상으로 하므로 다른 스레드, unwrap한 raw 연결, 별도 DataSource, scrollable cursor 이동, 한 행에 대량 데이터를 압축하는 쿼리까지 일반적으로 증명하지는 못합니다. 그런 설계를 선택한다면 관찰 범위를 확장하고 이유를 설명해야 하며 우회해서는 안 됩니다.
 
 ## 8. 완료 기준
 
-- [ ] 핵심 TODO를 구현하고 `testClasses` 및 전체 `test`가 통과한다.
-- [ ] 정확한 정렬과 모든 페이지, 회원 격리, 빈 결과, 404, 400을 확인했다.
-- [ ] 동일 시각 순서를 선언하고 구현 및 추가 테스트로 뒷받침했다.
-- [ ] 전량 조회 및 전량 메모리 적재가 없음을 쿼리·계측·코드로 설명할 수 있다.
-- [ ] 대량 데이터와 큰 page의 비용을 구분해 분석했다.
-- [ ] 요청 사이 데이터 변경의 영향과 인덱스 선택을 문서로 정리했다.
-- [ ] 아래 질문에 구현한 코드와 관찰 결과를 근거로 답했다.
+- [x] 핵심 서비스를 구현하고 `testClasses` 및 전체 `test`가 통과한다.
+- [x] 정확한 정렬과 모든 페이지, 회원 격리, 빈 결과, 404, 400을 확인했다.
+- [x] 동일 시각 순서를 선언하고 구현 및 추가 테스트로 뒷받침했다.
+- [x] 전량 조회 및 전량 메모리 적재가 없음을 쿼리·계측·코드로 설명할 수 있다.
+- [x] 대량 데이터와 큰 page의 비용을 구분해 분석했다.
+- [x] 요청 사이 데이터 변경의 영향과 인덱스 선택을 문서로 정리했다.
+- [x] 아래 질문에 구현한 코드와 관찰 결과를 근거로 답했다.
 
 ## 9. 구현 후 답해야 할 질문
 
@@ -173,10 +168,11 @@ page 0과 37(size 20)에서 소비 행 수와 엔티티 적재 수는 각각 **5
 
 ### 구현 기록
 
-- 동일 시각 정렬 규칙: (직접 작성)
-- 정확성 근거와 반례 검토: (직접 작성)
-- SQL / 결과 행 수 / entity 수 / DB 실행 계획: (직접 작성)
-- 큰 page 및 요청 사이 insert 관찰: (직접 작성)
-- 인덱스와 개선점: (직접 작성)
+- **동일 시각 정렬 규칙:** `created_at DESC, type DESC, id DESC`입니다. native query의 문자열 값 기준으로 POST가 COMMENT보다 먼저 오고, 같은 type에서는 PK id 내림차순입니다. type과 id를 함께 사용하므로 두 테이블에 같은 id가 있어도 완전한 순서입니다.
+- **정확성 근거와 반례 검토:** 각 테이블을 따로 자르지 않고 회원의 두 집합을 `UNION ALL`로 합친 뒤 단 하나의 전역 정렬과 offset/limit를 적용합니다. 최신 25개가 모두 POST인 것처럼 한쪽에 데이터가 몰려도 page 1은 POST 5개와 그 다음 COMMENT 15개를 정확히 반환합니다.
+- **SQL / 결과 행 수 / entity 수 / DB 실행 계획:** 응답에 total이 없으므로 count query를 제거했습니다. POST 10,000개와 COMMENT 40,000개 fixture의 page 0/37에서 요청당 Member 1행과 projection 20행, 합계 JDBC 21행 및 Hibernate entity 1개가 관찰됩니다. H2 `EXPLAIN` 검사에서 각 branch가 명시한 복합 인덱스를 사용하는지 테스트합니다. 이 값은 DB 내부 scan 행 수를 뜻하지 않습니다.
+- **큰 page 비용:** offset은 `(long) page * size`로 계산해 int overflow와 임의의 조기 빈 응답을 피합니다. 다만 offset 방식은 뒤 페이지로 갈수록 DB가 앞선 행을 읽고 버리는 비용이 증가합니다. 인덱스가 필터와 branch 정렬을 도와도 깊은 offset 자체의 비용은 남습니다.
+- **요청 사이 insert/delete:** page 0 이후 더 최신인 활동이 추가되면 기존 page 0의 마지막 항목이 page 1로 밀려 중복될 수 있습니다. 앞쪽 활동이 삭제되면 아직 받지 않은 항목이 이전 페이지로 당겨져 누락될 수 있습니다. 각 HTTP 요청은 별도 트랜잭션이라 같은 snapshot을 공유하지 않습니다. API 계약을 확장할 수 있다면 `(createdAt, type, id)` cursor 또는 첫 요청 기준점을 전달하는 방식을 검토합니다.
+- **인덱스와 개선점:** 두 테이블에 각각 `(member_id, created_at DESC, id DESC)` 인덱스를 둡니다. member_id로 회원 범위를 먼저 제한하고 branch 안의 시간/id 순서를 지원합니다. type은 branch별 상수라 인덱스 컬럼에 넣지 않습니다. 최종 UNION 병합과 offset 비용은 남으므로 운영 DB의 실행 계획과 깊은 page 지연 시간을 계속 관찰해야 합니다.
 
 환경 호환성 참고: [Spring Boot 3.5 공식 요구사항](https://docs.spring.io/spring-boot/3.5/system-requirements.html)

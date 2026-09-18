@@ -66,11 +66,18 @@ class ActivityServiceTest extends BusinessDatabaseTest {
 
     @Test void equalTimestampsHaveStableOrderAcrossRepeatedReadsAndPageSizes() {
         Member target = member("ties");
-        List<ActivityResponse> fixture = new ArrayList<>();
-        for (int i = 0; i < 23; i++) fixture.add(post(target, 0));
-        for (int i = 0; i < 22; i++) fixture.add(comment(target, 0));
+        List<ActivityResponse> posts = new ArrayList<>();
+        List<ActivityResponse> comments = new ArrayList<>();
+        for (int i = 0; i < 23; i++) posts.add(post(target, 0));
+        for (int i = 0; i < 22; i++) comments.add(comment(target, 0));
+        List<ActivityResponse> fixture = new ArrayList<>(posts);
+        fixture.addAll(comments);
+        List<ActivityResponse> declaredOrder = new ArrayList<>();
+        posts.reversed().forEach(declaredOrder::add);
+        comments.reversed().forEach(declaredOrder::add);
         List<ActivityResponse> baseline = page(target.getId(), 0, 100).activities();
-        assertThat(baseline).hasSize(45).containsExactlyInAnyOrderElementsOf(fixture);
+        assertThat(baseline).hasSize(45).containsExactlyElementsOf(declaredOrder)
+                .containsExactlyInAnyOrderElementsOf(fixture);
 
         for (int repeat = 0; repeat < 3; repeat++) {
             assertThat(page(target.getId(), 0, 100).activities()).containsExactlyElementsOf(baseline);
@@ -87,10 +94,16 @@ class ActivityServiceTest extends BusinessDatabaseTest {
         assertThat(page(target.getId(), 0, 20).activities()).isEmpty();
     }
 
-    @Test void veryLargeValidPageDoesNotOverflowIntoEarlierResults() {
+    @Test void veryLargeValidPageExecutesActivityQueryWithoutOverflowingIntoEarlierResults() {
         Member target = member("large page");
         post(target, 1);
-        assertThat(page(target.getId(), Integer.MAX_VALUE, 100).activities()).isEmpty();
+        readyForRequest();
+        try (JdbcReadProbe.Sample sample = JdbcReadProbe.begin()) {
+            ActivityPageResponse result = service.getActivities(target.getId(), Integer.MAX_VALUE, 100);
+            assertThat(result.activities()).isEmpty();
+            assertThat(sample.sql()).anyMatch(sql -> sql.toLowerCase(Locale.ROOT).contains("union all"));
+            assertThat(sample.sql()).noneMatch(sql -> sql.toLowerCase(Locale.ROOT).contains("count("));
+        }
     }
 
     @Test void missingMemberThrowsWithoutReadingActivityTables() {
